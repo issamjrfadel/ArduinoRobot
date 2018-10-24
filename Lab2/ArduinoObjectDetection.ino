@@ -9,8 +9,14 @@
 #define echoR 5      // ultrasonic sensor
 #define trigR 6      // ultrasonic sensor
 
-#define echoFront 23
-#define trigFront 22
+#define echoFrontTop 23 // For front top
+#define trigFrontTop 22 // For front top
+
+#define echoFrontBottom 26 // for front bottom
+#define trigFrontBottom 27 // for front bottom
+
+#define LIR 28      // left IR sensor
+#define RIR 29      // left IR sensor
 
 #define MAX_DISTANCE 150
 
@@ -23,10 +29,13 @@ int valL;
 
 // defines variables
 long durationR, durationL, durationFront;
-int distanceR, distanceL, distanceFront;
+int distanceR, distanceL, distanceFront, distanceFrontBottom;
+
 bool hasSearched = false;
 
 bool objectFound = false;
+
+int correctObject = 0;
 
 bool reachedRightEdge = false;
 bool reachedLeftEdge = false;
@@ -42,7 +51,8 @@ int turnBack = 0;
 
 NewPing sonarR(trigR, echoR, MAX_DISTANCE);
 NewPing sonarL(trigL, echoL, MAX_DISTANCE);
-NewPing sonarFront(trigFront, echoFront, MAX_DISTANCE);
+NewPing sonarFront(trigFrontTop, echoFrontTop, MAX_DISTANCE);
+NewPing sonarFrontBottom(trigFrontBottom, echoFrontBottom, MAX_DISTANCE);
 
 void setup()
 {
@@ -52,6 +62,10 @@ void setup()
   pinMode(RM1, OUTPUT);
   pinMode(RM2, OUTPUT);
   pinMode(PWMR, OUTPUT);
+
+  pinMode(LIR, INPUT);
+  pinMode(RIR, INPUT);
+
   Serial.begin(9600);
 
   //push sensor
@@ -59,8 +73,135 @@ void setup()
   pinMode(inPinL, INPUT);
 }
 
+void resetAllVar() {
+  hasSearched = false;
+  objectFound = false;
+  timesTurned = 0;
+  reachedRightEdge = false;
+  reachedLeftEdge = false;
+  turnBack = 0;
+  correctObject = 0;
+}
+
+void backOffObject() {
+bothSensorsOffTable();
+resetAllVar();
+searchFunction();
+}
+void driveForwardOnTable() {
+  digitalWrite(LM1, HIGH);
+  digitalWrite(LM2, LOW);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, HIGH);
+  digitalWrite(RM2, LOW);
+  analogWrite(PWMR, 60);
+  Serial.println("DRIVE");
+}
+void leftSensorOffTable() {
+  digitalWrite(LM1, LOW);
+  digitalWrite(LM2, LOW);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, LOW);
+  digitalWrite(RM2, LOW);
+  analogWrite(PWMR, 60);
+
+  delay(1000);
+
+  digitalWrite(LM1, LOW);
+  digitalWrite(LM2, HIGH);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, LOW);
+  digitalWrite(RM2, HIGH);
+  analogWrite(PWMR, 60);
+
+  delay(500);
+
+  Serial.println("TURN RIGHT");
+  digitalWrite(LM1, HIGH);
+  digitalWrite(LM2, LOW);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, LOW);
+  digitalWrite(RM2, HIGH);
+  analogWrite(PWMR, 60);
+
+  delay(1000);
+
+  Serial.println("DONE TURNING RIGHT");
+}
+void rightSensorOffTable() {
+  digitalWrite(LM1, LOW);
+  digitalWrite(LM2, LOW);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, LOW);
+  digitalWrite(RM2, LOW);
+  analogWrite(PWMR, 60);
+
+  delay(1000);
+
+  digitalWrite(LM1, LOW);
+  digitalWrite(LM2, HIGH);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, LOW);
+  digitalWrite(RM2, HIGH);
+  analogWrite(PWMR, 60);
+
+  delay(500);
+
+  Serial.println("TURN LEFT");
+  digitalWrite(LM1, LOW);
+  digitalWrite(LM2, HIGH);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, HIGH);
+  digitalWrite(RM2, LOW);
+  analogWrite(PWMR, 60);
+
+  delay(1000);
+
+  Serial.println("DONE TURN LEFT");
+}
+
+void bothSensorsOffTable() {
+  Serial.println("BOTH SENSORS OFF");
+  digitalWrite(LM1, LOW);
+  digitalWrite(LM2, LOW);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, LOW);
+  digitalWrite(RM2, LOW);
+  analogWrite(PWMR, 60);
+
+  delay(1000);
+
+  digitalWrite(LM1, LOW);
+  digitalWrite(LM2, HIGH);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, LOW);
+  digitalWrite(RM2, HIGH);
+  analogWrite(PWMR, 60);
+
+  delay(500);
+
+  digitalWrite(LM1, HIGH);
+  digitalWrite(LM2, LOW);
+  analogWrite(PWML, 60);
+
+  digitalWrite(RM1, LOW);
+  digitalWrite(RM2, HIGH);
+  analogWrite(PWMR, 60);
+  delay(1000);
+  Serial.println("DONE BOTH SENSORS OFF");
+}
+
 void searchFunction() {
-  while (hasSearched == false && objectFound == false && timesTurned < 44) {
+  while (hasSearched == false && objectFound == false && timesTurned < 43) {
 
     digitalWrite(LM1, LOW);
     digitalWrite(LM2, LOW);
@@ -98,6 +239,11 @@ void searchFunction() {
       analogWrite(PWMR, 60);
       break;
 
+    }
+
+    else if (timesTurned == 43) {
+      hasSearched = true;
+      Serial.println("searched 43 times");
     }
 
     //search right
@@ -189,12 +335,13 @@ void searchFunction() {
       }
 
       timesTurned = 44;
+      hasSearched = true;
       Serial.println("reached both edge");
       delay(100);
       break;
-
-
     }
+
+
 
   }
 }
@@ -205,16 +352,16 @@ void loop()
   //run the search function up top
   //searchObject();
   //----------------------------------
+  //----------------------------------
+  //1) start loop, if objectfound == true, move towards object
+  //2) else if objectfound == false and hassearched == true, move forward and search fcn
+  //3) if
+  //3) if
+  //----------------------------------
   distanceR = sonarR.ping_cm();
   distanceL = sonarL.ping_cm();
   distanceFront = sonarFront.ping_cm();
-
-  //        Serial.print("DistanceL: ");
-  //        Serial.println(distanceL);
-  //        Serial.print("DistanceR: ");
-  //        Serial.println(distanceR);
-  //        Serial.print("Distance Front: ");
-  //        Serial.println(distanceFront);
+  distanceFrontBottom = sonarFrontBottom.ping_cm();
 
   digitalWrite(LM1, LOW);
   digitalWrite(LM2, LOW);
@@ -224,210 +371,136 @@ void loop()
   digitalWrite(RM2, LOW);
   analogWrite(PWMR, 60);
 
-  //  while (hasSearched == false && objectFound == false && timesTurned < 44){
-  //
-  //        digitalWrite(LM1, LOW);
-  //        digitalWrite(LM2, LOW);
-  //        analogWrite(PWML, 60);
-  //
-  //        digitalWrite(RM1, LOW);
-  //        digitalWrite(RM2, LOW);
-  //        analogWrite(PWMR, 60);
-  //
-  //        delay(500);
-  //
-  //        distanceR = sonarR.ping_cm();
-  //        distanceL = sonarL.ping_cm();
-  //        distanceFront = sonarFront.ping_cm();
-  //
-  //        Serial.print("DistanceL: ");
-  //        Serial.println(distanceL);
-  //        Serial.print("DistanceR: ");
-  //        Serial.println(distanceR);
-  //        Serial.print("Distance Front: ");
-  //        Serial.println(distanceFront);
-  //
-  //        Serial.print("Times turned: ");
-  //        Serial.println(timesTurned);
-  //
-  //      if (distanceFront < 75 && distanceFront != 0){
-  //        objectFound = true;
-  //        Serial.println("object found");
-  //        digitalWrite(LM1, LOW);
-  //        digitalWrite(LM2, LOW);
-  //        analogWrite(PWML, 60);
-  //
-  //        digitalWrite(RM1, LOW);
-  //        digitalWrite(RM2, LOW);
-  //        analogWrite(PWMR, 60);
-  //                    break;
-  //
-  //      }
-  //
-  //      //search right
-  //      else if ((distanceFront > 75 || distanceFront == 0) && distanceR < 10 && reachedLeftEdge == false && reachedRightEdge == false){
-  //      Serial.println("search right");
-  //      digitalWrite(LM1, HIGH);
-  //      digitalWrite(LM2, LOW);
-  //      analogWrite(PWML, 60);
-  //
-  //      digitalWrite(RM1, LOW);
-  //      digitalWrite(RM2, HIGH);
-  //      analogWrite(PWMR, 60);
-  //
-  //      delay(200);
-  //
-  //      timesTurned = timesTurned + 1;
-  //      turnBack = turnBack + 1;
-  //
-  //
-  //      }
-  //      else if ((distanceFront > 75 || distanceFront == 0) && distanceR > 10 && reachedLeftEdge == false && reachedRightEdge == false){
-  //        reachedRightEdge =true;
-  //        Serial.println("reached right edge");
-  //
-  //      digitalWrite(LM1, LOW);
-  //      digitalWrite(LM2, LOW);
-  //      analogWrite(PWML, 60);
-  //
-  //      digitalWrite(RM1, LOW);
-  //      digitalWrite(RM2, LOW);
-  //      analogWrite(PWMR, 60);
-  //                  //delay(100);
-  //
-  //      }
-  //
-  //      //search left
-  //      else if ((distanceFront > 75 || distanceFront == 0) && distanceL < 10 && reachedLeftEdge == false && reachedRightEdge == true){
-  //        Serial.println("search Left");
-  //      digitalWrite(LM1, LOW);
-  //      digitalWrite(LM2, HIGH);
-  //      analogWrite(PWML, 60);
-  //
-  //      digitalWrite(RM1, HIGH);
-  //      digitalWrite(RM2, LOW);
-  //      analogWrite(PWMR, 60);
-  //
-  //      delay(200);
-  //
-  //       timesTurned = timesTurned + 1;
-  //      }
-  //
-  //      else if ((distanceFront > 75 || distanceFront == 0) && reachedLeftEdge == false && reachedRightEdge == true){
-  //        reachedLeftEdge = true;
-  //                Serial.println("reached left edge");
-  //
-  //              digitalWrite(LM1, LOW);
-  //      digitalWrite(LM2, LOW);
-  //      analogWrite(PWML, 60);
-  //
-  //      digitalWrite(RM1, LOW);
-  //      digitalWrite(RM2, LOW);
-  //      analogWrite(PWMR, 60);
-  //                  //delay(100);
-  //
-  //      }
-  //
-  //      else if (reachedLeftEdge == true && reachedRightEdge == true){
-  //        int temp = (timesTurned - turnBack)/2;
-  //        for (int i = 0; i < temp; i++){
-  //          digitalWrite(LM1, HIGH);
-  //      digitalWrite(LM2, LOW);
-  //      analogWrite(PWML, 60);
-  //
-  //      digitalWrite(RM1, LOW);
-  //      digitalWrite(RM2, HIGH);
-  //      analogWrite(PWMR, 60);
-  //      Serial.println(i);
-  //                  delay(200);
-  //
-  //                  digitalWrite(LM1, LOW);
-  //        digitalWrite(LM2, LOW);
-  //        analogWrite(PWML, 60);
-  //
-  //        digitalWrite(RM1, LOW);
-  //        digitalWrite(RM2, LOW);
-  //        analogWrite(PWMR, 60);
-  //
-  //        delay(500);
-  //        }
-  //
-  //        timesTurned = 44;
-  //                        Serial.println("reached both edge");
-  //                                    delay(100);
-  //                                    break;
-  //
-  //
-  //      }
-  //
-  //    }
-
-  searchFunction();
-
   if (objectFound) {
-    //      if(distanceFront > 20 && distanceFront < 70 && distanceFront != 0){
-    //      //move forward
-    //      Serial.println("found forward");
-    //      digitalWrite(LM1, HIGH);
-    //      digitalWrite(LM2, LOW);
-    //      analogWrite(PWML, 60);
-    //
-    //      digitalWrite(RM1, HIGH);
-    //      digitalWrite(RM2, LOW);
-    //      analogWrite(PWMR, 60);
-    //
-    //      delay(500);
-    //    }
-    //      else{
-    //              Serial.println("Stop");
-    //      digitalWrite(LM1, LOW);
-    //      digitalWrite(LM2, LOW);
-    //      analogWrite(PWML, 60);
-    //
-    //      digitalWrite(RM1, LOW);
-    //      digitalWrite(RM2, LOW);
-    //      analogWrite(PWMR, 60);
-    //      }
 
-    while (distanceFront > 10 && distanceFront < 75) {
+    distanceR = sonarR.ping_cm();
+    distanceL = sonarL.ping_cm();
+    distanceFront = sonarFront.ping_cm();
+    distanceFrontBottom = sonarFrontBottom.ping_cm();
+
+    while (distanceFront > 1 && distanceFront < 75) {
+
+      Serial.println("found object but has ran search - while");
+
+      if (distanceR <= 10 && distanceL <= 10) //move forward
+      {
+         if(distanceFront > 4 && distanceFront <= 12){
+                  if ((!digitalRead(LIR) && !digitalRead(RIR)) || (distanceFront - distanceFrontBottom) > 4) {
+                    correctObject = 1;
+                    while(distanceR <= 10 && distanceL <= 10){
+                          distanceR = sonarR.ping_cm();
+                       distanceL = sonarL.ping_cm();
+                      driveForwardOnTable();
+                      Serial.println("found correct object");
+                  }}
+                  else{
+                    correctObject = 2;
+                        break;
+                  }
+ 
+         }
+         else{
+            driveForwardOnTable();
+         }
+      }
+
+      else if (distanceL > 10 && distanceR <= 10) //turn right
+      {
+        leftSensorOffTable();
+      }
+
+      else if (distanceL <= 10 && distanceR > 10) //turn left
+      {
+        rightSensorOffTable();
+      }
+
+      else if (distanceL > 10 && distanceR > 10)    // stop
+      {
+        bothSensorsOffTable();
+
+
+      }
       distanceR = sonarR.ping_cm();
       distanceL = sonarL.ping_cm();
       distanceFront = sonarFront.ping_cm();
 
-      //move forward
-      Serial.println("found forward");
-      digitalWrite(LM1, HIGH);
-      digitalWrite(LM2, LOW);
-      analogWrite(PWML, 60);
-
-      digitalWrite(RM1, HIGH);
-      digitalWrite(RM2, LOW);
-      analogWrite(PWMR, 60);
-
-      delay(500);
-      //if click set true
     }
 
-    hasSearched = false;
-    objectFound = false;
-    timesTurned = 0;
-    reachedRightEdge = false;
-    reachedLeftEdge = false;
-    turnBack = 0;
+    if (correctObject == 2){
+      backOffObject();
+    }
+    resetAllVar();
+
+    //searchFunction();
   }
-  else {
-    //move forward then run search again
-//    Serial.println("move forward");
-//    digitalWrite(LM1, HIGH);
-//    digitalWrite(LM2, LOW);
-//    analogWrite(PWML, 60);
-//
-//    digitalWrite(RM1, HIGH);
-//    digitalWrite(RM2, LOW);
-//    analogWrite(PWMR, 60);
+
+  else if (hasSearched == true && objectFound == false) {
+    Serial.println("not found object but has ran search");
+    distanceR = sonarR.ping_cm();
+    distanceL = sonarL.ping_cm();
+    distanceFront = sonarFront.ping_cm();
+    int nothingFoundCounter = 0;
+
+    while ((distanceFront == 0 || distanceFront > 75) && nothingFoundCounter < 50) {
+      Serial.println("not found object but has ran search - while");
+
+      if (distanceR <= 10 && distanceL <= 10) //move forward
+      {
+        driveForwardOnTable();
+        nothingFoundCounter = nothingFoundCounter + 1;
+
+      }
+
+      else if (distanceL > 10 && distanceR <= 10) //turn right
+      {
+        leftSensorOffTable();
+      }
+
+      else if (distanceL <= 10 && distanceR > 10) //turn left
+      {
+        rightSensorOffTable();
+      }
+
+      else if (distanceL > 10 && distanceR > 10)    // stop
+      {
+        bothSensorsOffTable();
+
+
+      }
+      distanceR = sonarR.ping_cm();
+      distanceL = sonarL.ping_cm();
+      distanceFront = sonarFront.ping_cm();
+
+    }
+
+    resetAllVar();
+
+    Serial.println("first search");
+    Serial.println(hasSearched);
+    Serial.println(objectFound);
+    Serial.println(timesTurned);
+    Serial.println(reachedRightEdge);
+    Serial.println(reachedLeftEdge);
+    Serial.println(turnBack);
 
     searchFunction();
   }
+
+  else if (hasSearched == false && objectFound == false) {
+
+    resetAllVar();
+
+    Serial.println("first search");
+    Serial.println(hasSearched);
+    Serial.println(objectFound);
+    Serial.println(timesTurned);
+    Serial.println(reachedRightEdge);
+    Serial.println(reachedLeftEdge);
+    Serial.println(turnBack);
+
+    searchFunction();
+  }
+
 
 
 }
