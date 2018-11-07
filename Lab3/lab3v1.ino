@@ -6,7 +6,7 @@
 #define rightMaxSpeed 60 // max speed of the robot
 #define leftMaxSpeed 60 // max speed of the robot
 #define rightBaseSpeed 60 // this is the speed at which the motors should spin when the robot is perfectly on the line
-#define leftBaseSpeed 11  // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define leftBaseSpeed 60  // this is the speed at which the motors should spin when the robot is perfectly on the line
 
 #define echoL 3      // ultrasonic sensor
 #define trigL 4      // ultrasonic sensor
@@ -79,6 +79,7 @@ void setup()
   Serial.println();
   delay(1000);
 }
+int lastError = 0;
 
 int irPosition() {
   //Ir sensor
@@ -142,17 +143,31 @@ void moveStraight() {
 void followLine() {
   do {
         getDistanceLR();
+        int position = irPosition();
+        int error = position - 3500;
 
-    if(3000 < irPosition() <5000){
-      moveStraight();
-    }
-    else if (irPosition() < 3000) {
-      turnRight();
-    }
-    else if (irPosition() > 5000){
-      turnLeft();
-    }
-  }while((0 > irPosition() < 8000) && (distanceR <= 10 && distanceL <= 10));
+
+        int motorSpeed = Kp * error + Kd * (error - lastError);
+           lastError = error;
+        
+          int rightMotorSpeed = rightBaseSpeed + motorSpeed;
+          int leftMotorSpeed = leftBaseSpeed - motorSpeed;
+        
+          if (rightMotorSpeed > rightMaxSpeed ) rightMotorSpeed = rightMaxSpeed; // prevent the motor from going beyond max speed
+          if (leftMotorSpeed > leftMaxSpeed ) leftMotorSpeed = leftMaxSpeed; // prevent the motor from going beyond max speed
+          if (rightMotorSpeed < 0) rightMotorSpeed = 0; // keep the motor speed positive
+          if (leftMotorSpeed < 0) leftMotorSpeed = 0; // keep the motor speed positive
+        
+          {
+            digitalWrite(RM1, HIGH);
+            digitalWrite(RM2, LOW);
+            analogWrite(PWMR, rightMotorSpeed);
+            
+            digitalWrite(LM1, HIGH);
+            digitalWrite(LM2, LOW);
+            analogWrite(PWML, leftMotorSpeed);
+          }
+  }while(distanceR <= 10 && distanceL <= 10);
 }
 
 void getDistanceLR(){
@@ -326,7 +341,6 @@ void moveOnTable() {
 void loop()
 {
   moveOnTable();
-  return;
   followLine();
 
 }
