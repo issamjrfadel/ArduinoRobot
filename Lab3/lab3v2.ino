@@ -477,5 +477,4 @@ void loop()
 {
   moveOnTable();
   followLine();
-
 }
