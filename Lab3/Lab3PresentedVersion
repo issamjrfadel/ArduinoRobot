@@ -1,0 +1,625 @@
+#define PWML 9     // left motor power
+#define PWMR 11    // right motor power
+
+#define Kp 0.1 // experiment to determine this, start by something small that just makes your bot follow the line at a slow speed
+#define Kd 0.2 // experiment to determine this, slowly increase the speeds and adjust this value. ( Note: Kp < Kd) 
+#define ki 0
+#define rightMaxSpeed 40 // max speed of the robot
+#define leftMaxSpeed 40 // max speed of the robot
+#define rightBaseSpeed 40 // this is the speed at which the motors should spin when the robot is perfectly on the line
+#define leftBaseSpeed 40  // this is the speed at which the motors should spin when the robot is perfectly on the line
+
+#define echoL 3      // ultrasonic sensor
+#define trigL 4      // ultrasonic sensor
+
+#define echoR 5      // ultrasonic sensor
+#define trigR 6      // ultrasonic sensor
+
+#define echoF 23      // ultrasonic sensor
+#define trigF 22      // ultrasonic sensor
+
+#define echoF2 25
+#define trigF2 24
+
+#define echoRear 5      // ultrasonic sensor
+#define trigRear 6      // ultrasonic sensor
+
+#include <QTRSensors.h>
+
+// defines variables
+long durationR, durationL, durationF, durationRear, durationF2;
+int distanceR, distanceL, distanceF, distanceRear, distanceF2;
+/*-------definning Outputs------*/
+#define LM1 8       // left motor
+#define LM2 7       // left motor
+#define RM1 12      // right motor
+#define RM2 13      // right motor
+
+#define NUM_SENSORS             7  // number of sensors used
+#define NUM_SAMPLES_PER_SENSOR  4  // average 4 analog samples per sensor reading
+#define EMITTER_PIN             QTR_NO_EMITTER_PIN  // emitter is controlled by digital pin 2
+
+// sensors 0 through 5 are connected to analog inputs 0 through 5, respectively
+QTRSensorsAnalog qtra((unsigned char[]) {
+ 0, 1, 2, 3, 4, 5, 6
+},
+NUM_SENSORS, NUM_SAMPLES_PER_SENSOR, EMITTER_PIN);
+unsigned int sensorValues[NUM_SENSORS];
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//SETUP
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+void setup()
+{
+ pinMode(echoR, INPUT);
+ pinMode(trigR, OUTPUT);
+ pinMode(echoL, INPUT);
+ pinMode(trigL, OUTPUT);
+
+ pinMode(echoF, INPUT);
+ pinMode(trigF, OUTPUT);
+ pinMode(echoRear, INPUT);
+ pinMode(trigRear, OUTPUT);
+ pinMode(echoF2, INPUT);
+ pinMode(trigF2, OUTPUT);
+
+ pinMode(PWML, OUTPUT);
+ pinMode(LM1, OUTPUT);
+ pinMode(LM2, OUTPUT);
+ pinMode(RM1, OUTPUT);
+ pinMode(RM2, OUTPUT);
+ pinMode(PWMR, OUTPUT);
+
+ //Calibrate the 8 ir sensors
+ delay(300);
+ pinMode(13, OUTPUT);
+ digitalWrite(13, HIGH);    // turn on Arduino's LED to indicate we are in calibration mode
+ for (int i = 0; i < 400; i++)  // make the calibration take about 10 seconds
+ {
+   qtra.calibrate();       // reads all sensors 10 times at 2.5 ms per six sensors (i.e. ~25 ms per call)
+ }
+ digitalWrite(13, LOW);     // turn off Arduino's LED to indicate we are through with calibration
+
+ // print the calibration minimum values measured when emitters were on
+ Serial.begin(9400);
+ for (int i = 0; i < NUM_SENSORS; i++)
+ {
+   Serial.print(qtra.calibratedMinimumOn[i]);
+   Serial.print(' ');
+ }
+ Serial.println();
+
+ // print the calibration maximum values measured when emitters were on
+ for (int i = 0; i < NUM_SENSORS; i++)
+ {
+   Serial.print(qtra.calibratedMaximumOn[i]);
+   Serial.print(' ');
+ }
+ Serial.println();
+ Serial.println();
+ delay(1000);
+}
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// IR POSITION
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+int lastError = 0;
+
+int irPosition() {
+ //Ir sensor
+ // read calibrated sensor values and obtain a measure of the line position from 0 to 3000
+ // To get raw sensor values, call:
+ //  qtra.read(sensorValues); instead of unsigned int position = qtra.readLine(sensorValues);
+ unsigned int position = qtra.readLine(sensorValues);
+
+ // print the sensor values as numbers from 0 to 1000, where 0 means maximum reflectance and
+ // 1000 means minimum reflectance, followed by the line position
+ for (unsigned char i = 0; i < NUM_SENSORS; i++)
+ {
+   Serial.print(sensorValues[i]);
+   Serial.print('\t');
+ }
+ //Serial.println(); // uncomment this line if you are using raw values
+ Serial.println(position); // comment this line out if you are using raw values
+
+ delay(230);
+
+ return position;
+}
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// TURNING DIRECTIONS WITHOUT BACKUP
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+void turnLeft() {
+
+ Serial.println("TURN LEFT");
+ digitalWrite(LM1, LOW);
+ digitalWrite(LM2, HIGH);
+ analogWrite(PWML, 30);
+
+ digitalWrite(RM1, HIGH);
+ digitalWrite(RM2, LOW);
+ analogWrite(PWMR, 30);
+ //Serial.println("DONE TURN LEFT");
+}
+
+void turnRight() {
+ Serial.println("TURN RIGHT");
+ digitalWrite(LM1, HIGH);
+ digitalWrite(LM2, LOW);
+ analogWrite(PWML, 30);
+
+ digitalWrite(RM1, LOW);
+ digitalWrite(RM2, HIGH);
+ analogWrite(PWMR, 30);
+}
+
+void moveStraight() {
+ digitalWrite(LM1, HIGH);
+ digitalWrite(LM2, LOW);
+ analogWrite(PWML, 40);
+
+ digitalWrite(RM1, HIGH);
+ digitalWrite(RM2, LOW);
+ analogWrite(PWMR, 40);
+ Serial.println("DRIVE");
+}
+
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// OBJECT AVOIDANCE
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+void leftSensorTriggered(){
+  while(distanceL <= 10 && distanceF > 30 && distanceF2 < 30){
+     
+      turnLeft();
+      getDistanceLR();
+      getDistanceF();
+      //delay(30);
+      getDistanceF2();
+   }
+}
+
+void rightSensorTriggered(){
+  while(distanceR <= 10 && distanceF < 30 && distanceF2 > 30){
+  
+     turnRight();
+     getDistanceLR();
+     getDistanceF();
+     //delay(30);
+     getDistanceF2();
+  }
+  
+}
+void bothSensorsTriggered(){
+  while(distanceL <= 10 && distanceF < 30 && distanceF2 < 30){
+        
+      turnLeft();
+      getDistanceLR();
+      getDistanceF();
+      //delay(30);
+      getDistanceF2();
+   }
+}
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// SONAR SENSOR GROUP
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//----------------------
+// SONAR LEFT AND RIGHT
+//----------------------
+void getDistanceLR(){
+   // Clears the trigPin
+ digitalWrite(trigL, LOW);
+ delayMicroseconds(2);
+ digitalWrite(trigR, LOW);
+ delayMicroseconds(2);
+ // Sets the trigPin on HIGH state for 10 micro seconds
+
+ digitalWrite(trigL, HIGH);
+ delayMicroseconds(10);
+ digitalWrite(trigL, LOW);
+
+ // Reads the echoPin, returns the sound wave travel time in microseconds
+ durationL = pulseIn(echoL, HIGH);
+ // Calculating the distance
+ distanceL = durationL * 0.034 / 2;
+
+
+ digitalWrite(trigR, HIGH);
+ delayMicroseconds(10);
+ digitalWrite(trigR, LOW);
+
+ // Reads the echoPin, returns the sound wave travel time in microseconds
+ durationR = pulseIn(echoR, HIGH);
+ // Calculating the distance
+ distanceR = durationR * 0.034 / 2;
+ // Prints the distance on the Serial Monitor
+
+ Serial.print("DistanceL: ");
+ Serial.println(distanceL);
+ Serial.print("DistanceR: ");
+ Serial.println(distanceR);
+ //????
+ //delay(1000);
+}
+
+//--------------------------------------
+// SONAR FRONT FACING LEFT (Right side)
+//--------------------------------------
+void getDistanceF() {
+ // Clears the trigPin
+ digitalWrite(trigF, LOW);
+ delayMicroseconds(2);
+ // Sets the trigPin on HIGH state for 10 micro seconds
+
+ digitalWrite(trigF, HIGH);
+ delayMicroseconds(10);
+ digitalWrite(trigF, LOW);
+
+ // Reads the echoPin, returns the sound wave travel time in microseconds
+ durationF = pulseIn(echoF, HIGH);
+ // Calculating the distance
+ distanceF = durationF * 0.034 / 2;
+
+ Serial.print("DistanceF: ");
+ Serial.println(distanceF);
+ //delay(1000);
+}
+
+//--------------------------------------
+// SONAR FRONT2 FACING RIGHT (Left side)
+//--------------------------------------
+void getDistanceF2(){
+   // Clears the trigPin
+ digitalWrite(trigF2, LOW);
+ delayMicroseconds(2);
+ // Sets the trigPin on HIGH state for 10 micro seconds
+
+ digitalWrite(trigF2, HIGH);
+ delayMicroseconds(10);
+ digitalWrite(trigF2, LOW);
+
+ // Reads the echoPin, returns the sound wave travel time in microseconds
+ durationF2 = pulseIn(echoF2, HIGH);
+ // Calculating the distance
+ distanceF2 = durationF2 * 0.034 / 2;
+
+ Serial.print("DistanceF2: ");
+ Serial.println(distanceF2);
+}
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// LOGIC FOR MOVEMENT
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+/***********************************************************************************
+Called if the robot detects that it is on the line and tries to follow the line 
+while avoiding edges and objects
+************************************************************************************/
+void followLine() {
+ getDistanceLR();
+ getDistanceF();
+ //delay(30);
+ getDistanceF2();
+
+ while(distanceR <= 10 && distanceL <= 10 && distanceF >= 30 && distanceF2 >= 30 && (300 < irPosition() <= 4000)){
+       int position = irPosition();
+       int error = position - 3300;
+
+
+       int motorSpeed = Kp * error + Kd * (error - lastError);
+       
+          lastError = error;
+
+         int rightMotorSpeed = rightBaseSpeed + motorSpeed;
+         int leftMotorSpeed = leftBaseSpeed - motorSpeed;
+
+         if (rightMotorSpeed > rightMaxSpeed ) rightMotorSpeed = rightMaxSpeed; // prevent the motor from going beyond max speed
+         if (leftMotorSpeed > leftMaxSpeed ) leftMotorSpeed = leftMaxSpeed; // prevent the motor from going beyond max speed
+         if (rightMotorSpeed < 0) rightMotorSpeed = 0; // keep the motor speed positive
+         if (leftMotorSpeed < 0) leftMotorSpeed = 0; // keep the motor speed positive
+
+         {
+           digitalWrite(RM1, HIGH);
+           digitalWrite(RM2, LOW);
+           analogWrite(PWMR, rightMotorSpeed);
+
+           digitalWrite(LM1, HIGH);
+           digitalWrite(LM2, LOW);
+           analogWrite(PWML, leftMotorSpeed);
+           Serial.println("Follow Line");
+           Serial.println(irPosition());
+         }
+
+  getDistanceLR();
+  getDistanceF();
+  //delay(30);
+  getDistanceF2();       
+ }
+}
+
+/***********************************************************************************
+Called if the robot detects that it is on the line but the sensors are triggered
+  1) if table sensors are on table and both front sensors do not sense anything, 
+    proceed to follow line
+  2) else if table sensors are on table but either front sensors are less than 30, 
+  turn left or right until nothing is detected
+  3) else if the robot is on the line but the sensors are off the table, turn accordingly
+  
+************************************************************************************/
+
+void checkLRSensorButOnTape(){
+ 
+ getDistanceLR();
+ getDistanceF();
+ //delay(30);
+ getDistanceF2();
+
+ while(300 < irPosition() <= 4000){
+   getDistanceLR();
+   getDistanceF();
+   //delay(30);
+   getDistanceF2();
+   
+   if (distanceR <= 10 && distanceL <= 10 && distanceF >= 30 && distanceF2 >= 30){
+     //goes into second while loop to follow line, if that breaks, then break out of this function
+     followLine();
+     break;
+   }
+   else if(distanceR <= 10 && distanceL <= 10 && (distanceF < 30 || distanceF2 < 30) ){
+     //right sensor triggered, turn right
+      if (distanceF < 30 && distanceF2 > 30){
+        rightSensorTriggered();
+     }
+     //left sensor triggered, turn left
+     else if(distanceF > 30 && distanceF2 < 30){
+        leftSensorTriggered();
+     }
+     //both sensors triggered, turn left
+     else if(distanceF < 30 && distanceF2 < 30){
+        bothSensorsTriggered();
+     }
+     
+     
+
+   }
+   else if(distanceR <= 10 && distanceL > 10){
+      while(distanceL > 10){
+         turnRight();
+         getDistanceLR();
+         //getDistanceF();
+         ////delay(30);
+         //getDistanceF2();
+     }
+
+     //turn right until sensor off edge, leave function
+   }
+   else if (distanceR >10 && distanceL <= 10){
+     while(distanceR > 10){
+         turnLeft();
+         getDistanceLR();
+         //getDistanceF();
+         ////delay(30);
+         //getDistanceF2();
+     }
+
+
+   }
+   else if (distanceR >10 && distanceL > 10){
+     Serial.println("BOTH SENSORS OFF");
+     digitalWrite(LM1, LOW);
+     digitalWrite(LM2, LOW);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, LOW);
+     analogWrite(PWMR, 40);
+
+     delay(1000);
+
+     digitalWrite(LM1, LOW);
+     digitalWrite(LM2, HIGH);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, HIGH);
+     analogWrite(PWMR, 40);
+
+     delay(300);
+
+     digitalWrite(LM1, HIGH);
+     digitalWrite(LM2, LOW);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, HIGH);
+     analogWrite(PWMR, 40);
+     delay(1000);
+     Serial.println("DONE BOTH SENSORS OFF");
+
+
+   }
+ }
+
+}
+
+
+/***********************************************************************************
+Called if the robot does not detect line, perform regular table and object detection
+************************************************************************************/
+void moveOnTable() {
+
+ while (irPosition() < 300) {
+   getDistanceLR();
+   getDistanceF();
+   //delay(30);
+   getDistanceF2();
+   //Serial.println(distanceL);
+     // Serial.println(irPosition());
+   if (distanceR <= 10 && distanceL <= 10 && distanceF >= 30 && distanceF2 >= 30) //move forward
+   {
+     moveStraight();
+   }
+   else if(distanceR <= 10 && distanceL <= 10 && (distanceF < 30 || distanceF2 < 30)){
+      //right sensor triggered, turn right
+      if (distanceF < 30 && distanceF2 > 30){
+        rightSensorTriggered();
+     }
+     //left sensor triggered, turn left
+     else if(distanceF > 30 && distanceF2 < 30){
+        leftSensorTriggered();
+     }
+     //both sensors triggered, turn left
+     else if(distanceF < 30 && distanceF2 < 30){
+        bothSensorsTriggered();
+     }
+     
+   }
+   else if (distanceL > 10 && distanceR <= 10) //turn right
+   {
+
+     digitalWrite(LM1, LOW);
+     digitalWrite(LM2, LOW);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, LOW);
+     analogWrite(PWMR, 40);
+
+     delay(1000);
+
+     digitalWrite(LM1, LOW);
+     digitalWrite(LM2, HIGH);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, HIGH);
+     analogWrite(PWMR, 40);
+
+     delay(800);
+
+     Serial.println("TURN RIGHT");
+     digitalWrite(LM1, HIGH);
+     digitalWrite(LM2, LOW);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, HIGH);
+     analogWrite(PWMR, 40);
+
+     delay(1000);
+
+     Serial.println("DONE TURNING RIGHT");
+
+
+   }
+   else if (distanceL <= 10 && distanceR > 10) //turn left
+   {
+
+     digitalWrite(LM1, LOW);
+     digitalWrite(LM2, LOW);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, LOW);
+     analogWrite(PWMR, 40);
+
+     delay(1000);
+
+     digitalWrite(LM1, LOW);
+     digitalWrite(LM2, HIGH);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, HIGH);
+     analogWrite(PWMR, 40);
+
+     delay(800);
+
+     Serial.println("TURN LEFT");
+     digitalWrite(LM1, LOW);
+     digitalWrite(LM2, HIGH);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, HIGH);
+     digitalWrite(RM2, LOW);
+     analogWrite(PWMR, 40);
+
+     delay(1000);
+
+     Serial.println("DONE TURN LEFT");
+
+
+   }
+   else if (distanceL > 10 && distanceR > 10)    // stop
+   {
+
+     Serial.println("BOTH SENSORS OFF");
+     digitalWrite(LM1, LOW);
+     digitalWrite(LM2, LOW);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, LOW);
+     analogWrite(PWMR, 40);
+
+     delay(1000);
+
+     digitalWrite(LM1, LOW);
+     digitalWrite(LM2, HIGH);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, HIGH);
+     analogWrite(PWMR, 40);
+
+     delay(800);
+
+     digitalWrite(LM1, HIGH);
+     digitalWrite(LM2, LOW);
+     analogWrite(PWML, 40);
+
+     digitalWrite(RM1, LOW);
+     digitalWrite(RM2, HIGH);
+     analogWrite(PWMR, 40);
+     delay(1000);
+     Serial.println("DONE BOTH SENSORS OFF");
+
+   }
+ }
+}
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// LOOP
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+void loop()
+{
+ //moveontable is when its not on the tape
+ moveOnTable();
+ //checkLRSensorButOnTape is when the IR sensor sees the tape and checks if either sensor is off the table
+ // if not off the table, it runs followLine();
+ checkLRSensorButOnTape();
+ //followLine();
+
+}
